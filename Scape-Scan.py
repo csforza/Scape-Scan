@@ -7,6 +7,7 @@ from scapy.all import *
 from termcolor import colored
 import time
 import random
+import re
 
 TOP_PORTS = [1, 3, 4, 6, 7, 9, 13, 17, 19, 20, 21, 22, 23, 24, 25, 26, 30, 32, 33, 37, 42, 43, 49, 53, 70, 79, 80, 81,
              82, 83, 84, 85, 88, 89, 90, 99, 100, 106, 109, 110, 111, 113, 119, 125, 135, 139, 143, 144, 146, 161, 163,
@@ -102,7 +103,8 @@ def get_args():
     if not options.ip:
         parser.error(colored("\n[-] Please specify the ip\n"
                              "[-] Use either '-t <IP>' to specify a single target\n"
-                             "[-] Or use '-t <IP>, <IP>, ....' to specify more than one target\n",
+                             "[-] Or use '-t <IP>, <IP>, ....' to specify more than one target\n"
+                             "[-] You can specify a single ip or a range (0-255) for each target\n",
                              "red"))
 
     if not options.ports and not options.tops:
@@ -140,20 +142,33 @@ def get_args():
     # only doing comma-separated ip's input for now
     # put them all into a list
     if options.ip:
-        if "," in options.ip:
-            new_ips = list_ips(options.ip)
+        regex = r"[0-9]{1,3}-[0-9]{1,3}"
+        if "," not in options.ip and re.search(regex, options.ip):
+            new_ips = full_ips(options.ip)
+        elif "," in options.ip:
+            separated_ips = list_ips(options.ip)
+            for sip in separated_ips:
+                if re.search(regex, sip):
+                    new_ips.extend(full_ips(sip))
+                else:
+                    new_ips.append(sip)
         else:
             new_ips = [options.ip]
 
     return new_ips, new_ports, options.tops, options.confirm
 
 
-# so far, only doing comma-separated ip's
 def list_ips(ips):
-    if "," in ips:
-        split_ips = ips.split(",")
-    return split_ips
+    return ips.split(",")
 
+
+def full_ips(ips):
+    part1 = ips[:ips.find(ips.split(".")[3])]
+    part2 = ips.split(".")[3].split("-")
+    new_ips = []
+    for i in range(int(part2[0]), int(part2[1]) + 1):
+        new_ips.append(part1 + str(i))
+    return new_ips
 
 # takes the -p input and returns a list of comma-separated type int ports
 # for each port within the user-specified range
@@ -419,6 +434,8 @@ if __name__ == "__main__":
     print(f'Finished in {round(finish - start, 2)} second(s).')
 
 # todo
+# disable nmap scan option / or if just ports given just do a quick scan and have them input -c
+# scan domains in addition to ips
 # ping sweep functionality
 # input nmap options
 # allow <IP>-<IP> input so a user doesn't have to comma separate all possible targets to scan
