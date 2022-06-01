@@ -168,6 +168,9 @@ def full_ips(ips):
     new_ips = []
     for i in range(int(part2[0]), int(part2[1]) + 1):
         new_ips.append(part1 + str(i))
+    for j in new_ips:
+        if '.0' in j[-2:]:
+            new_ips.remove(j)
     return new_ips
 
 # takes the -p input and returns a list of comma-separated type int ports
