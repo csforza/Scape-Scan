@@ -1,5 +1,7 @@
 # Scape-Scan - A Python Port Scanner Using Scapy and Nmap
 
+**Version 1.1 - Ping sweeping now available**
+
 From what was a simple port scanner using Scapy, I decided to expand upon the program I created for a class.  It performs quick scanning
 of any ports you wish, given an IP or set of IP's that you wish to scan.
 
@@ -43,18 +45,19 @@ python Scape-Scan.py --help
 
 [*] A Python Port Scanner Using Scapy and Nmap
 
-[*] v1.0 
+[*] v1.1 - Ping Sweeping Now Available 
 [*] by csforza
 
-usage: scapescan [-h] [-t IP] [-p PORTS] [-q] [-c]
+usage: Scape-Scan.py [-h] [-t IP] [-p PORTS] [-q] [-c] [-P]
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   -t IP, --target IP    Target ip(s) to scan
   -p PORTS, --ports PORTS
                         Port range to scan.
   -q, --top-1000        Quick top 1000 port scan.
   -c, --confirm-scan    Run an nmap scan on specified ports to confirm results
+  -P, --ping            Perform a ping sweep.
 ```
 
 ### Inputting Ports
@@ -72,6 +75,51 @@ optional arguments:
 ```bash
 [-] Use either '-t <IP>' to specify a single target
 [-] Or use '-t <IP>, <IP>, ....' to specify more than one target
+```
+
+### Ping Sweeping
+
+- Can use as a standalone option.
+- Or if run with other parameters, then it will grab the open hosts and scan them with your specified parameters.
+
+```bash
+python Scape-Scan.py -t 10.10.110.123-125 -P -q                                                 
+
+
+███████╗ ██████╗ █████╗ ██████╗ ███████╗        ███████╗ ██████╗ █████╗ ███╗   ██╗
+██╔════╝██╔════╝██╔══██╗██╔══██╗██╔════╝        ██╔════╝██╔════╝██╔══██╗████╗  ██║
+███████╗██║     ███████║██████╔╝█████╗  ███████╗███████╗██║     ███████║██╔██╗ ██║
+╚════██║██║     ██╔══██║██╔═══╝ ██╔══╝  ╚══════╝╚════██║██║     ██╔══██║██║╚██╗██║
+███████║╚██████╗██║  ██║██║     ███████╗        ███████║╚██████╗██║  ██║██║ ╚████║
+╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝     ╚══════╝        ╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═══╝
+
+[*] A Python Port Scanner Using Scapy and Nmap
+
+[*] v1.1 - Ping Sweeping Now Available 
+[*] by csforza
+
+[+] Host 10.10.110.123 is open.
+[+] Host 10.10.110.124 is open.
+[-] Host 10.10.110.125 is not open.
+
+[*] Now performing a quick scan of top 1000 ports for: 10.10.110.123
+
+[+] 10.10.110.123:22 is open.
+[+] 10.10.110.123:80 is open.
+[+] 10.10.110.123:8000 is open.
+[+] 10.10.110.123:8089 is open.
+
+[*] Open ports for 10.10.110.123: [22,80,8000,8089]
+
+[*] Now performing a quick scan of top 1000 ports for: 10.10.110.124
+
+[+] 10.10.110.124:80 is open.
+
+[*] Open ports for 10.10.110.124: [80]
+
+[+] Now running "nmap -sC -sV -oA" on the open ports for 10.10.110.123...
+
+...
 ```
 
 ### Output
@@ -189,13 +237,5 @@ PORT      STATE SERVICE
 Nmap done: 1 IP address (1 host up) scanned in 91.59 seconds
 
 Finished in 518.73 second(s).
-```
-
-### Todo
-```bash
-# todo
-# ping sweep functionality
-# input nmap options
-# allow <IP>-<IP> input so a user doesn't have to comma separate all possible targets to scan
 ```
 

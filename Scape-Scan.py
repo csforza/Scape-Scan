@@ -82,7 +82,7 @@ def title():
 
 [*] A Python Port Scanner Using Scapy and Nmap
 
-[*] v1.0 
+[*] v1.1 - Ping Sweeping Now Available 
 [*] by csforza
 """
 
@@ -97,6 +97,7 @@ def get_args():
     parser.add_argument("-q", "--top-1000", dest="tops", help="Quick top 1000 port scan.", action='store_true')
     parser.add_argument("-c", "--confirm-scan", dest="confirm",
                         help="Run an nmap scan on specified ports to confirm results", action='store_true')
+    parser.add_argument("-P", "--ping", dest="ping", help="Perform a ping sweep.", action='store_true')
 
     options = parser.parse_args()
 
@@ -107,8 +108,8 @@ def get_args():
                              "[-] You can specify a single ip or a range (0-255) for each target\n",
                              "red"))
 
-    if not options.ports and not options.tops:
-        parser.error(colored("\n[-] Please specify port(s) to scan...\n"
+    if not options.ports and not options.tops and not options.ping:
+        parser.error(colored("\n[-] Please specify port(s) to scan or specify '-P' for a ping sweep...\n\n"
                              "[-] Use either '-p <port> - <port>' to specify a range\n"
                              "[-] Use either '-p <port> - <port>, <port> - <port>' to specify more than one range\n"
                              "[-] Use '-p <port>' or '-p <port>,<port>....' to specify specific port(s)\n"
@@ -145,6 +146,20 @@ def get_args():
         regex = r"[0-9]{1,3}-[0-9]{1,3}"
         if "," not in options.ip and re.search(regex, options.ip):
             new_ips = full_ips(options.ip)
+        elif "0/24" in options.ip:
+            if "," not in options.ip:
+                test_ip = options.ip.replace("0/24", "0-255")
+                new_ips = full_ips(test_ip)
+            else:
+                separated_ips = list_ips(options.ip)
+                for ip_range in separated_ips:
+                    if "0/24" in ip_range:
+                        ip_range = ip_range.replace("0/24", "0-255")
+                        new_ips.extend(full_ips(ip_range))
+                    if re.search(regex, ip_range):
+                        new_ips.extend(full_ips(ip_range))
+                    else:
+                        new_ips.append(ip_range)
         elif "," in options.ip:
             separated_ips = list_ips(options.ip)
             for sip in separated_ips:
@@ -155,7 +170,12 @@ def get_args():
         else:
             new_ips = [options.ip]
 
-    return new_ips, new_ports, options.tops, options.confirm
+        regex2 = r"[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
+        for r in new_ips:
+            if not re.search(regex2, r):
+                parser.error(colored('[-] Please specify ip addresses of type x.x.x.x', 'red'))
+
+    return new_ips, new_ports, options.tops, options.confirm, options.ping
 
 
 def list_ips(ips):
@@ -163,9 +183,12 @@ def list_ips(ips):
 
 
 def full_ips(ips):
+    # find the '0-255' part of the ip if this range is specified
     part1 = ips[:ips.find(ips.split(".")[3])]
+    # grab the numbers within the range
     part2 = ips.split(".")[3].split("-")
     new_ips = []
+    # could include 0-255 only functionality
     for i in range(int(part2[0]), int(part2[1]) + 1):
         new_ips.append(part1 + str(i))
     for j in new_ips:
@@ -204,7 +227,7 @@ def list_ports(p):
 def scan(ip, port):
     src_port = random.randint(1025, 65534)
     # so we use sr1, looking for a single response, with the S (syn) flag to initiate the connection
-    res = sr1(IP(dst=ip) / TCP(flags='S', sport=src_port, dport=port), timeout=.4, verbose=0)
+    res = sr1(IP(dst=ip) / TCP(flags='S', sport=src_port, dport=port), timeout=1, verbose=0)
 
     # do nothing if no response received
     # necessary, otherwise an error prints and stops the program
@@ -343,6 +366,7 @@ def nmap(ip, quick, open_ports_to_scan=None, options_ports=None, confirm=None):
     if confirm:
         # if any ports were specified in the options then run with those ports, otherwise just run on top-1000
         if options_ports:
+            options_ports = list(set(options_ports))
             # if -q and ports != all
             if quick and len(options_ports) != 65535:
                 print(colored(f'[+] Now running a quick -T4 nmap scan on top 1000 plus specified ports on {ip} '
@@ -380,6 +404,19 @@ def nmap(ip, quick, open_ports_to_scan=None, options_ports=None, confirm=None):
     return
 
 
+def ping_sweep(ips):
+    ips_to_scan = []
+    for ip in ips:
+        reply = sr1(IP(dst=ip, ttl=20) / ICMP(), timeout=3, verbose=0)
+        if reply is not None:
+            print(colored(f'[+] Host {ip} is open.', 'yellow'))
+            ips_to_scan.append(ip)
+        else:
+            print(colored(f'[-] Host {ip} is not open.', 'red'))
+    print()
+    return ips_to_scan
+
+
 def main():
     title()
     if len(sys.argv) < 2:
@@ -388,6 +425,8 @@ def main():
     inputs = get_args()
     quick_scan = False
     input_ips, input_ports, confirm_scan = inputs[0], inputs[1], inputs[3]
+    do_ping_sweep = inputs[4]
+    ping_sweep_done = False
 
     # by 'full scan', I mean scan with -p specified, regardless of the number of ports
     top_scan_ports, full_scan_ports = [], []
@@ -396,38 +435,51 @@ def main():
     # each ip will have it own open ports stored in an element in top_scan_ports
     if inputs[2]:
         quick_scan = True
+        # if ping sweep is specified, take the open hosts and replace input_ips with the pingable ips
+        # since it's a waste of time to scan closed hosts
+        if do_ping_sweep:
+            input_ips = ping_sweep(input_ips)
+            ping_sweep_done = True
         for i in input_ips:
             if not input_ports:
                 top_scan_ports.append(top_1000_port_scan(i, False))
             else:
                 top_scan_ports.append(top_1000_port_scan(i))
-            print("\n")
+            print()
             # I find the scans are a little more accurate when I add this between ip's
             time.sleep(5)
 
     # if user does not specify a port range and wants only a quick scan, then nmap the results
     # otherwise scan the desired ports
     if quick_scan and not input_ports:
+        if do_ping_sweep and not ping_sweep_done:
+            input_ips = ping_sweep(input_ips)
         for i in range(len(input_ips)):
             nmap(input_ips[i], quick_scan, top_scan_ports[i], full_scan_ports, confirm_scan)
     else:
-        # for every ip, a separate port scan is conducted, the open ports for each ip are saved into a list
-        # which will go into nmap() later
-        for i in range(len(input_ips)):
-            print(colored(f"[*] Performing full port scan of {input_ips[i]}\n", "green"))
-            if len(top_scan_ports) > 0:
-                # ip_line runs the full port scan, accepting the ip, ports, whether a quick scan has already
-                # been done (boolean) and the open ports already found
-                full_scan_ports.append(ip_scan(input_ips[i], input_ports, quick_scan, top_scan_ports[i]))
-                time.sleep(5)
-            # if no quick scan has been performed
-            else:
-                full_scan_ports.append(ip_scan(input_ips[i], input_ports, quick_scan))
-                time.sleep(5)
+        # if just a ping sweep is specified, just do a ping sweep
+        if do_ping_sweep and not inputs[2] and not confirm_scan and not input_ports:
+            _ = ping_sweep(input_ips)
+        else:
+            if do_ping_sweep:
+                input_ips = ping_sweep(input_ips)
+            # for every ip, a separate port scan is conducted, the open ports for each ip are saved into a list
+            # which will go into nmap() later
+            for i in range(len(input_ips)):
+                print(colored(f"[*] Performing full port scan of {input_ips[i]}\n", "green"))
+                if len(top_scan_ports) > 0:
+                    # ip_line runs the full port scan, accepting the ip, ports, whether a quick scan has already
+                    # been done (boolean) and the open ports already found
+                    full_scan_ports.append(ip_scan(input_ips[i], input_ports, quick_scan, top_scan_ports[i]))
+                    time.sleep(5)
+                # if no quick scan has been performed
+                else:
+                    full_scan_ports.append(ip_scan(input_ips[i], input_ports, quick_scan))
+                    time.sleep(5)
 
-        # do the nmap scans after all the ports have been scanned
-        for i in range(len(input_ips)):
-            nmap(input_ips[i], quick_scan, full_scan_ports[i], input_ports, confirm_scan)
+            # do the nmap scans after all the ports have been scanned
+            for i in range(len(input_ips)):
+                nmap(input_ips[i], quick_scan, full_scan_ports[i], input_ports, confirm_scan)
 
 
 if __name__ == "__main__":
@@ -439,6 +491,4 @@ if __name__ == "__main__":
 # todo
 # disable nmap scan option / or if just ports given just do a quick scan and have them input -c
 # scan domains in addition to ips
-# ping sweep functionality
 # input nmap options
-# allow <IP>-<IP> input so a user doesn't have to comma separate all possible targets to scan
