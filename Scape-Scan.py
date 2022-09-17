@@ -8,6 +8,7 @@ from termcolor import colored
 import time
 import random
 import re
+import subprocess
 
 TOP_PORTS = [1, 3, 4, 6, 7, 9, 13, 17, 19, 20, 21, 22, 23, 24, 25, 26, 30, 32, 33, 37, 42, 43, 49, 53, 70, 79, 80, 81,
              82, 83, 84, 85, 88, 89, 90, 99, 100, 106, 109, 110, 111, 113, 119, 125, 135, 139, 143, 144, 146, 161, 163,
@@ -91,7 +92,7 @@ def title():
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "--target", dest="ip", help="Target ip(s) to scan")
+    parser.add_argument("-t", "--target", dest="ip", help="Target ip(s) to scan.")
     parser.add_argument("-p", "--ports", dest="ports", help="Port range to scan.")
     # action=store_true -> if no value is necessary
     parser.add_argument("-q", "--top-1000", dest="tops", help="Quick top 1000 port scan.", action='store_true')
@@ -227,7 +228,7 @@ def list_ports(p):
 def scan(ip, port):
     src_port = random.randint(1025, 65534)
     # so we use sr1, looking for a single response, with the S (syn) flag to initiate the connection
-    res = sr1(IP(dst=ip) / TCP(flags='S', sport=src_port, dport=port), timeout=1, verbose=0)
+    res = sr1(IP(dst=ip) / TCP(flags='S', sport=src_port, dport=port), timeout=.4, verbose=0)
 
     # do nothing if no response received
     # necessary, otherwise an error prints and stops the program
@@ -350,7 +351,7 @@ def nmap(ip, quick, open_ports_to_scan=None, options_ports=None, confirm=None):
         my_str = ','.join(open_ports_to_scan)
         print(colored(f'[+] Now running "nmap -sC -sV -oA" on the open ports for {ip}...\n', 'cyan'))
 
-        cmd = f'/usr/bin/nmap -sC -sV -oA {ip} -p {my_str} {ip} -Pn'
+        cmd = f'/usr/bin/nmap -sC -sV -oA -p {my_str} {ip} -Pn'
         # The module shlex will take a string containing the whole shell command and split it up
         # exactly how Popen and check_output expect it
         args = shlex.split(cmd)
