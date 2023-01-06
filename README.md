@@ -14,7 +14,7 @@ are not sufficient.
 Finally, there is also an option to just scan the Nmap Top 1000 ports without having to input any ports.
 
 I had designed this in preparation for the OSCP exam, in order that I can do some quick
-enumeration while having the program do a more full scan in the background while doing enumeration.
+enumeration while having the program do a more full scan in the background.
 
 I have colorized the output for easier viewing and made the program print out a list
 of all the open ports as well.
